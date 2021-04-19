@@ -1,0 +1,29 @@
+1. 运行环境
+pytorch1.0 python3
+
+2.upsample参数问题
+由于trt的upsample与pytorch的不一致。但是现在只有一种精度可以对上。
+
+pytorch：F.upsample(x, size=(H, W), mode='bilinear',align_corners=True)
+tensorrt：    
+IResizeLayer* P5_resize = network->addResize(*P5->getOutput(0));
+    auto C4_shape = network->addShape(*C4->getOutput(0))->getOutput(0);
+    P5_resize->setInput(1, *C4_shape);
+    P5_resize->setResizeMode(ResizeMode::kLINEAR);
+    P5_resize->setAlignCorners(true);
+    assert(P5_resize);
+
+上面trt和pytorch写法精度才能对的上。
+
+所以pytorch里面的upsample需要加上align_corners=True，默认是没有加的。
+./psenet/models/fpn_resnet.py
+
+//line 178
+ def _upsample(self, x, y, scale=1):
+        _, _, H, W = y.size()
+        return F.upsample(x, size=(H // scale, W // scale), mode='bilinear', align_corners=True)  ######
+//line 182
+    def _upsample_add(self, x, y):
+        _, _, H, W = y.size()
+        return F.upsample(x, size=(H, W), mode='bilinear', align_corners=True) + y   ######
+
